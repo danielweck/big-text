@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html class="debug">
+<html class="empty">
   <head>
-    <title>Large Text</title>
+    <title>Big Text</title>
     <meta charset="UTF-8" />
     <!-- meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" -->
     <meta
@@ -9,6 +9,11 @@
       content="width=device-width, initial-scale=1, maximum-scale=10, user-scalable=yes"
     />
     <style type="text/css">
+      @media (prefers-color-scheme: dark) {
+        html {
+          --prefers-color-scheme-dark: 1;
+        }
+      }
       * {
         box-sizing: border-box;
         outline: none;
@@ -248,57 +253,76 @@
           //     // }
           //   }
         };
-        const updateStateEmpty = (force) => {
-          document.documentElement.classList[
-            force || largeText.textContent.length ? "remove" : "add"
-          ]("empty");
+
+        const updateStateEmpty = (forcePlaceholderRemove) => {
+          const key =
+            forcePlaceholderRemove || largeText.textContent.trim().length
+              ? "remove"
+              : "add";
+          console.log("state update: empty", key);
+          document.documentElement.classList[key]("empty");
         };
+
         const updateStateDebug = () => {
-          document.documentElement.classList[
-            checkDebug.checked ? "add" : "remove"
-          ]("debug");
+          const key = checkDebug.checked ? "add" : "remove";
+          console.log("state update: debug", key);
+          document.documentElement.classList[key]("debug");
         };
+
         const updateStateDark = () => {
-          document.documentElement.classList[
-            checkDark.checked ? "add" : "remove"
-          ]("dark");
+          const key = checkDark.checked ? "add" : "remove";
+          console.log("state update: dark", key);
+          document.documentElement.classList[key]("dark");
         };
 
         {
           // init
-          let settings = localStorage.getItem("largeTextSettings");
-          settings = JSON.parse(settings);
+          const settings = JSON.parse(
+            localStorage.getItem("largeTextSettings") || "{}"
+          );
+          console.log("settings:", settings);
 
-          checkDark.checked = settings && settings.dark;
-          checkDebug.checked = settings && settings.debug;
+          const style = window.getComputedStyle(document.documentElement);
+          const preferDark = style.getPropertyValue(
+            "--prefers-color-scheme-dark"
+          );
+          console.log("preferDark:", typeof settings.dark, `__${preferDark}__`);
+          if (
+            typeof settings.dark === "undefined" &&
+            typeof preferDark === "string" &&
+            preferDark.trim() === "1"
+          ) {
+            console.log("OS dark mode");
+            settings.dark = true;
+          }
 
-          updateStateEmpty();
-          updateStateDebug();
+          checkDark.checked = Boolean(settings.dark);
           updateStateDark();
+
+          checkDebug.checked = Boolean(settings.debug);
+          updateStateDebug();
+
+          updateStateEmpty(false);
         }
 
-        checkDark.addEventListener("click", (evt) => {
-          updateStateDark();
-          let settings = localStorage.getItem("largeTextSettings");
-          if (!settings) {
-            settings = {};
-          } else {
-            settings = JSON.parse(settings);
-          }
-          settings.dark = checkDark.checked;
+        const updateLocalStorageState = (key, val) => {
+          const settings = JSON.parse(
+            localStorage.getItem("largeTextSettings") || "{}"
+          );
+          settings[key] = val;
           localStorage.setItem("largeTextSettings", JSON.stringify(settings));
+        };
+
+        checkDark.addEventListener("click", (evt) => {
+          console.log("checkbox click dark");
+          updateStateDark();
+          updateLocalStorageState("dark", checkDark.checked);
         });
 
         checkDebug.addEventListener("click", (evt) => {
+          console.log("checkbox click debug");
           updateStateDebug();
-          let settings = localStorage.getItem("largeTextSettings");
-          if (!settings) {
-            settings = {};
-          } else {
-            settings = JSON.parse(settings);
-          }
-          settings.debug = checkDebug.checked;
-          localStorage.setItem("largeTextSettings", JSON.stringify(settings));
+          updateLocalStorageState("debug", checkDebug.checked);
         });
 
         let previousLargeText = "";
@@ -311,17 +335,25 @@
           updateStateSize();
         });
         largeText.addEventListener("keyup", (evt) => {
-          updateStateEmpty();
+          console.log("keyup => placeholder update");
+          updateStateEmpty(false);
+        });
+        largeText.addEventListener("click", (evt) => {
+          console.log("focus => placeholder update");
+          updateStateEmpty(false);
         });
         largeText.addEventListener("focusin", (evt) => {
-          updateStateEmpty(true);
+          console.log("focus => placeholder remove");
+          updateStateEmpty(false);
         });
 
         container.addEventListener("click", (evt) => {
+          console.log("click => focus text");
           largeText.focus();
         });
       };
       document.addEventListener("DOMContentLoaded", () => {
+        console.log("DOMContentLoaded");
         onDOMContentLoaded();
       });
     </script>
