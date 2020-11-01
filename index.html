@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html class="debug">
+  <head>
+    <title>Large Text</title>
+    <meta charset="UTF-8" />
+    <!-- meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=10, user-scalable=yes"
+    />
+    <style type="text/css">
+      * {
+        box-sizing: border-box;
+        outline: none;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        color: #333333;
+        background-color: #eeeeee;
+        font-size: 1em;
+        line-height: 1.2;
+      }
+      html {
+        overflow-x: hidden;
+      }
+      html.dark,
+      html.dark body {
+        background-color: #333333;
+        color: #eeeeee;
+      }
+      ::selection {
+        color: white;
+        background: #333333;
+      }
+      html.dark ::selection {
+        color: white;
+        background: black;
+      }
+      #container {
+        display: block;
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        cursor: text;
+      }
+      html.debug #container {
+        outline-style: dashed;
+        outline-color: cyan;
+        outline-width: 2px;
+        outline-offset: -2px;
+      }
+      #large,
+      #placeholder {
+        font-family: serif;
+        font-weight: bolder;
+        font-size: 10em;
+        line-height: 1.2;
+        padding-left: 0.2em;
+        padding-left: 0.2em;
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        text-align: center;
+        caret-color: magenta;
+      }
+      #large {
+        word-wrap: break-word;
+      }
+      #placeholder {
+        display: none;
+        color: white;
+        text-shadow: 0px 0px 0.05em silver;
+      }
+      html.dark #placeholder {
+        color: #222222;
+        text-shadow: 0px 0px 0.05em #555555;
+      }
+      html.empty #placeholder {
+        display: block;
+      }
+      html.debug #large {
+        outline-style: dotted;
+        outline-color: magenta;
+        outline-width: 4px;
+        outline-offset: -2px;
+      }
+      #controls {
+        user-select: none;
+        display: flex;
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: auto;
+        padding: 1em;
+        font-family: sans-serif;
+        text-transform: uppercase;
+        z-index: 100;
+      }
+      html.debug #controls {
+        outline-style: solid;
+        outline-color: green;
+        outline-width: 1px;
+        outline-offset: 0px;
+      }
+      #controls input ~ span {
+        vertical-align: text-top;
+        padding-left: 0.3em;
+      }
+      #controls label {
+        cursor: pointer;
+      }
+      #controls > div {
+        padding-right: 1em;
+      }
+      html.debug #controls > div {
+        outline-style: dotted;
+        outline-color: silver;
+        outline-width: 1px;
+        outline-offset: 0px;
+      }
+
+      input[type="checkbox"] {
+        outline: none;
+        -webkit-appearance: none;
+        appearance: none;
+        border: 2px solid #900c3f;
+        border-radius: 3px;
+        display: inline-block;
+        position: relative;
+        padding: 0.2em;
+        font-size: 2em;
+        vertical-align: middle;
+        background-color: #ffd4cb;
+        color: yellow;
+        cursor: pointer;
+      }
+      li > input[type="checkbox"] {
+        margin-right: 0.2em;
+      }
+      input[type="checkbox"]:checked {
+        background-color: #27ae60;
+        border: 2px solid #196f3d;
+      }
+      input[type="checkbox"]:checked::after {
+        content: "\2714";
+        font-size: 0.4em;
+        position: absolute;
+        top: -2px;
+        left: 2px;
+        color: white;
+      }
+    </style>
+    <script type="text/javascript">
+      const onDOMContentLoaded = () => {
+        const checkDark = document.getElementById("check-dark");
+        const checkDebug = document.getElementById("check-debug");
+        const largeText = document.getElementById("large");
+        const container = document.getElementById("container");
+
+        let timerID = undefined;
+        let adjustFontSizePreviousUp = 0;
+        let adjustFontSizePreviousDown = 0;
+        const adjustFontSize = () => {
+          const style = window.getComputedStyle(largeText);
+          if (!largeText.getAttribute("data-fontSize")) {
+            largeText.setAttribute("data-fontSize", style.fontSize); // includes "px" unit
+          }
+          let fontSize = parseInt(style.fontSize);
+          const down = largeText.offsetHeight > container.offsetHeight;
+          if (down && fontSize <= 20) {
+            adjustFontSizePreviousDown = 0;
+            adjustFontSizePreviousUp = 0;
+            return;
+          }
+          if (!down && fontSize >= 160) {
+            adjustFontSizePreviousDown = 0;
+            adjustFontSizePreviousUp = 0;
+            return;
+          }
+
+          fontSize += (down ? -1 : 1) * 4;
+          if (down) {
+            if (adjustFontSizePreviousDown === fontSize) {
+              console.log("BREAKING DOWN LOOP", fontSize);
+              largeText.style.fontSize = `${fontSize}px`;
+              adjustFontSizePreviousDown = 0;
+              adjustFontSizePreviousUp = 0;
+              return;
+            }
+            adjustFontSizePreviousDown = fontSize;
+          } else {
+            if (adjustFontSizePreviousUp === fontSize) {
+              console.log("BREAKING UP LOOP", fontSize);
+              adjustFontSizePreviousDown = 0;
+              adjustFontSizePreviousUp = 0;
+              return;
+            }
+            adjustFontSizePreviousUp = fontSize;
+          }
+
+          largeText.style.fontSize = `${fontSize}px`;
+
+          console.log(
+            "FONT ADJUST",
+            down,
+            fontSize
+            //   largeText.offsetHeight,
+            //   container.offsetHeight
+          );
+
+          timerID = setTimeout(() => {
+            adjustFontSize();
+          }, 100);
+        };
+        const updateStateSize = () => {
+          if (timerID) {
+            clearTimeout(timerID);
+          }
+          adjustFontSizePreviousUp = 0;
+          adjustFontSizePreviousDown = 0;
+          adjustFontSize();
+
+          //   if (largeText.offsetHeight > container.offsetHeight) {
+          //     console.log(
+          //       "OVERFLOW !! :(",
+          //       largeText.offsetHeight,
+          //       container.offsetHeight
+          //     );
+          //     adjustFontSize(true);
+          //   } else {
+          //     console.log(
+          //       "NOT OVERFLOW :)",
+          //       largeText.offsetHeight,
+          //       container.offsetHeight
+          //     );
+          //     adjustFontSize(false);
+          //     // const fontSizeAttr = largeText.getAttribute("data-fontSize");
+          //     // if (fontSizeAttr) {
+          //     //   largeText.style.fontSize = fontSizeAttr;
+          //     //   console.log(fontSizeAttr);
+          //     // }
+          //   }
+        };
+        const updateStateEmpty = (force) => {
+          document.documentElement.classList[
+            force || largeText.textContent.length ? "remove" : "add"
+          ]("empty");
+        };
+        const updateStateDebug = () => {
+          document.documentElement.classList[
+            checkDebug.checked ? "add" : "remove"
+          ]("debug");
+        };
+        const updateStateDark = () => {
+          document.documentElement.classList[
+            checkDark.checked ? "add" : "remove"
+          ]("dark");
+        };
+
+        {
+          // init
+          let settings = localStorage.getItem("largeTextSettings");
+          settings = JSON.parse(settings);
+
+          checkDark.checked = settings && settings.dark;
+          checkDebug.checked = settings && settings.debug;
+
+          updateStateEmpty();
+          updateStateDebug();
+          updateStateDark();
+        }
+
+        checkDark.addEventListener("click", (evt) => {
+          updateStateDark();
+          let settings = localStorage.getItem("largeTextSettings");
+          if (!settings) {
+            settings = {};
+          } else {
+            settings = JSON.parse(settings);
+          }
+          settings.dark = checkDark.checked;
+          localStorage.setItem("largeTextSettings", JSON.stringify(settings));
+        });
+
+        checkDebug.addEventListener("click", (evt) => {
+          updateStateDebug();
+          let settings = localStorage.getItem("largeTextSettings");
+          if (!settings) {
+            settings = {};
+          } else {
+            settings = JSON.parse(settings);
+          }
+          settings.debug = checkDebug.checked;
+          localStorage.setItem("largeTextSettings", JSON.stringify(settings));
+        });
+
+        let previousLargeText = "";
+        largeText.addEventListener("keydown", (evt) => {
+          const t = largeText.textContent;
+          if (t === previousLargeText) {
+            return;
+          }
+          previousLargeText = t;
+          updateStateSize();
+        });
+        largeText.addEventListener("keyup", (evt) => {
+          updateStateEmpty();
+        });
+        largeText.addEventListener("focusin", (evt) => {
+          updateStateEmpty(true);
+        });
+
+        container.addEventListener("click", (evt) => {
+          largeText.focus();
+        });
+      };
+      document.addEventListener("DOMContentLoaded", () => {
+        onDOMContentLoaded();
+      });
+    </script>
+  </head>
+  <body>
+    <div id="container">
+      <div id="placeholder">Type here...</div>
+      <div id="large" contenteditable>&nbsp;</div>
+    </div>
+    <div id="controls">
+      <div>
+        <label
+          ><input type="checkbox" id="check-debug" /><span>debug</span></label
+        >
+      </div>
+      <div>
+        <label
+          ><input type="checkbox" id="check-dark" /><span>dark</span></label
+        >
+      </div>
+    </div>
+  </body>
+</html>
