@@ -84,8 +84,8 @@
         font-weight: bolder;
         font-size: 10em;
         line-height: 1.2;
-        padding-left: 0.2em;
-        padding-right: 0.2em;
+        padding-left: 0.5em;
+        padding-right: 0.5em;
         padding-top: 0.5em;
         padding-bottom: 0.5em;
         text-align: center;
@@ -122,6 +122,8 @@
       #controls {
         user-select: none;
         display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
         position: fixed;
         left: 0;
         right: 0;
@@ -397,6 +399,9 @@
           } else {
             document.execCommand("paste", false, text);
           }
+          setTimeout(() => {
+            updateStateEmpty();
+          }, 200);
         });
 
         let previousIncreaseTargetFontSize = 0;
@@ -656,12 +661,12 @@
     <div id="controls">
       <div>
         <label
-          ><input type="checkbox" id="check-debug" /><span>debug</span></label
+          ><input type="checkbox" id="check-dark" /><span>dark</span></label
         >
       </div>
-      <div>
+      <div style="margin-left: auto">
         <label
-          ><input type="checkbox" id="check-dark" /><span>dark</span></label
+          ><input type="checkbox" id="check-debug" /><span>debug</span></label
         >
       </div>
     </div>
