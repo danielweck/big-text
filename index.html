@@ -3,11 +3,14 @@
   <head>
     <title>Big Text</title>
     <meta charset="UTF-8" />
-    <!-- meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=10, user-scalable=yes"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
     />
+    <!-- meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=10, user-scalable=yes"
+    / -->
     <link rel="icon" href="icons/icon-72x72.png" />
     <link rel="manifest" href="app.webmanifest" />
     <style type="text/css">
@@ -15,6 +18,9 @@
         html {
           --prefers-color-scheme-dark: 1;
         }
+      }
+      textarea {
+        border: 0;
       }
       * {
         box-sizing: border-box;
@@ -30,7 +36,7 @@
         line-height: 1.2;
       }
       html {
-        overflow-x: hidden;
+        overflow: hidden;
       }
       html.dark,
       html.dark body {
@@ -45,8 +51,12 @@
         color: white;
         background: black;
       }
-      #container {
-        display: block;
+      #container,
+      #container2 {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
         position: absolute;
         left: 0;
         right: 0;
@@ -62,25 +72,37 @@
       }
       #large,
       #placeholder {
-        font-family: serif;
-        font-weight: bolder;
-        font-size: 10em;
-        line-height: 1.2;
-        padding-left: 0.2em;
-        padding-left: 0.2em;
+        /*
         position: absolute;
         left: 0;
         right: 0;
         top: 50%;
         transform: translateY(-50%);
+        */
+        flex: 1;
+        font-family: serif;
+        font-weight: bolder;
+        font-size: 10em;
+        line-height: 1.2;
+        padding-left: 0.2em;
+        padding-right: 0.2em;
+        padding-top: 0.5em;
+        padding-bottom: 0.5em;
         text-align: center;
         caret-color: magenta;
-      }
-      #large {
-        word-wrap: break-word;
+        text-size-adjust: none;
+        font-stretch: expanded;
+        word-break: break-all;
+        /*
+        word-wrap: anywhere;
+        overflow-wrap: anywhere;
+        */
+        white-space: pre-wrap;
+        background-color: transparent;
       }
       #placeholder {
-        display: none;
+        display: block;
+        visibility: hidden;
         color: white;
         text-shadow: 0px 0px 0.05em silver;
       }
@@ -89,13 +111,13 @@
         text-shadow: 0px 0px 0.05em #555555;
       }
       html.empty #placeholder {
-        display: block;
+        visibility: visible;
       }
       html.debug #large {
         outline-style: dotted;
         outline-color: magenta;
         outline-width: 4px;
-        outline-offset: -2px;
+        outline-offset: -4px;
       }
       #controls {
         user-select: none;
@@ -114,7 +136,7 @@
         outline-style: solid;
         outline-color: green;
         outline-width: 1px;
-        outline-offset: 0px;
+        outline-offset: -1px;
       }
       #controls input ~ span {
         vertical-align: text-top;
@@ -124,13 +146,20 @@
         cursor: pointer;
       }
       #controls > div {
-        padding-right: 1em;
+        padding: 0.5em;
+        border-radius: 10px;
+        margin-right: 0.5em;
+        background: rgba(200, 200, 200, 0.5);
       }
+      html.dark #controls > div {
+        background: rgba(10, 10, 10, 0.5);
+      }
+
       html.debug #controls > div {
         outline-style: dotted;
         outline-color: silver;
         outline-width: 1px;
-        outline-offset: 0px;
+        outline-offset: -1px;
       }
 
       input[type="checkbox"] {
@@ -165,96 +194,353 @@
       }
     </style>
     <script type="text/javascript">
+      // ########################################################################################
+      // https://github.com/lodash/lodash/blob/e0029485ab4d97adea0cb34292afb6700309cf16/throttle.js#L52-L68
+      // ALTERNATIVE: https://github.com/jashkenas/underscore/blob/ee99923b7882502a1ad56e3900c3bb267f3dcf76/underscore.js#L1084-L1123
+      function isObject(value) {
+        const type = typeof value;
+        return value != null && (type === "object" || type === "function");
+      }
+      function throttle(func, wait, options) {
+        let leading = true;
+        let trailing = true;
+
+        if (typeof func !== "function") {
+          throw new TypeError("Expected a function");
+        }
+        if (isObject(options)) {
+          leading = "leading" in options ? !!options.leading : leading;
+          trailing = "trailing" in options ? !!options.trailing : trailing;
+        }
+        return debounce(func, wait, {
+          leading,
+          trailing,
+          maxWait: wait,
+        });
+      }
+      // ########################################################################################
+      // ########################################################################################
+      // https://github.com/lodash/lodash/blob/e0029485ab4d97adea0cb34292afb6700309cf16/debounce.js#L65-L211
+      // ALTERNATIVE: https://github.com/jashkenas/underscore/blob/ee99923b7882502a1ad56e3900c3bb267f3dcf76/underscore.js#L1129-L1156
+      const root = window;
+      function debounce(func, wait, options) {
+        let lastArgs, lastThis, maxWait, result, timerId, lastCallTime;
+
+        let lastInvokeTime = 0;
+        let leading = false;
+        let maxing = false;
+        let trailing = true;
+
+        // Bypass `requestAnimationFrame` by explicitly setting `wait=0`.
+        const useRAF =
+          !wait &&
+          wait !== 0 &&
+          typeof root.requestAnimationFrame === "function";
+
+        if (typeof func !== "function") {
+          throw new TypeError("Expected a function");
+        }
+        wait = +wait || 0;
+        if (isObject(options)) {
+          leading = !!options.leading;
+          maxing = "maxWait" in options;
+          maxWait = maxing ? Math.max(+options.maxWait || 0, wait) : maxWait;
+          trailing = "trailing" in options ? !!options.trailing : trailing;
+        }
+
+        function invokeFunc(time) {
+          const args = lastArgs;
+          const thisArg = lastThis;
+
+          lastArgs = lastThis = undefined;
+          lastInvokeTime = time;
+          result = func.apply(thisArg, args);
+          return result;
+        }
+
+        function startTimer(pendingFunc, wait) {
+          if (useRAF) {
+            root.cancelAnimationFrame(timerId);
+            return root.requestAnimationFrame(pendingFunc);
+          }
+          return setTimeout(pendingFunc, wait);
+        }
+
+        function cancelTimer(id) {
+          if (useRAF) {
+            return root.cancelAnimationFrame(id);
+          }
+          clearTimeout(id);
+        }
+
+        function leadingEdge(time) {
+          // Reset any `maxWait` timer.
+          lastInvokeTime = time;
+          // Start the timer for the trailing edge.
+          timerId = startTimer(timerExpired, wait);
+          // Invoke the leading edge.
+          return leading ? invokeFunc(time) : result;
+        }
+
+        function remainingWait(time) {
+          const timeSinceLastCall = time - lastCallTime;
+          const timeSinceLastInvoke = time - lastInvokeTime;
+          const timeWaiting = wait - timeSinceLastCall;
+
+          return maxing
+            ? Math.min(timeWaiting, maxWait - timeSinceLastInvoke)
+            : timeWaiting;
+        }
+
+        function shouldInvoke(time) {
+          const timeSinceLastCall = time - lastCallTime;
+          const timeSinceLastInvoke = time - lastInvokeTime;
+
+          // Either this is the first call, activity has stopped and we're at the
+          // trailing edge, the system time has gone backwards and we're treating
+          // it as the trailing edge, or we've hit the `maxWait` limit.
+          return (
+            lastCallTime === undefined ||
+            timeSinceLastCall >= wait ||
+            timeSinceLastCall < 0 ||
+            (maxing && timeSinceLastInvoke >= maxWait)
+          );
+        }
+
+        function timerExpired() {
+          const time = Date.now();
+          if (shouldInvoke(time)) {
+            return trailingEdge(time);
+          }
+          // Restart the timer.
+          timerId = startTimer(timerExpired, remainingWait(time));
+        }
+
+        function trailingEdge(time) {
+          timerId = undefined;
+
+          // Only invoke if we have `lastArgs` which means `func` has been
+          // debounced at least once.
+          if (trailing && lastArgs) {
+            return invokeFunc(time);
+          }
+          lastArgs = lastThis = undefined;
+          return result;
+        }
+
+        function cancel() {
+          if (timerId !== undefined) {
+            cancelTimer(timerId);
+          }
+          lastInvokeTime = 0;
+          lastArgs = lastCallTime = lastThis = timerId = undefined;
+        }
+
+        function flush() {
+          return timerId === undefined ? result : trailingEdge(Date.now());
+        }
+
+        function pending() {
+          return timerId !== undefined;
+        }
+
+        function debounced(...args) {
+          const time = Date.now();
+          const isInvoking = shouldInvoke(time);
+
+          lastArgs = args;
+          lastThis = this;
+          lastCallTime = time;
+
+          if (isInvoking) {
+            if (timerId === undefined) {
+              return leadingEdge(lastCallTime);
+            }
+            if (maxing) {
+              // Handle invocations in a tight loop.
+              timerId = startTimer(timerExpired, wait);
+              return invokeFunc(lastCallTime);
+            }
+          }
+          if (timerId === undefined) {
+            timerId = startTimer(timerExpired, wait);
+          }
+          return result;
+        }
+        debounced.cancel = cancel;
+        debounced.flush = flush;
+        debounced.pending = pending;
+        return debounced;
+      }
+      // ########################################################################################
+
       const onDOMContentLoaded = () => {
         const checkDark = document.getElementById("check-dark");
         const checkDebug = document.getElementById("check-debug");
-        const largeText = document.getElementById("large");
         const container = document.getElementById("container");
+        const placeholder = document.getElementById("placeholder");
+        const largeText = document.getElementById("large");
 
-        let timerID = undefined;
-        let adjustFontSizePreviousUp = 0;
-        let adjustFontSizePreviousDown = 0;
-        const adjustFontSize = () => {
-          const style = window.getComputedStyle(largeText);
-          if (!largeText.getAttribute("data-fontSize")) {
-            largeText.setAttribute("data-fontSize", style.fontSize); // includes "px" unit
-          }
-          let fontSize = parseInt(style.fontSize);
-          const down = largeText.offsetHeight > container.offsetHeight;
-          if (down && fontSize <= 20) {
-            adjustFontSizePreviousDown = 0;
-            adjustFontSizePreviousUp = 0;
-            return;
-          }
-          if (!down && fontSize >= 160) {
-            adjustFontSizePreviousDown = 0;
-            adjustFontSizePreviousUp = 0;
-            return;
-          }
+        largeText.focus();
 
-          fontSize += (down ? -1 : 1) * 4;
-          if (down) {
-            if (adjustFontSizePreviousDown === fontSize) {
-              console.log("BREAKING DOWN LOOP", fontSize);
-              largeText.style.fontSize = `${fontSize}px`;
-              adjustFontSizePreviousDown = 0;
-              adjustFontSizePreviousUp = 0;
-              return;
-            }
-            adjustFontSizePreviousDown = fontSize;
+        largeText.addEventListener("paste", function (e) {
+          e.preventDefault();
+
+          let text = "";
+          if (e.clipboardData || e.originalEvent.clipboardData) {
+            text = (e.originalEvent || e).clipboardData.getData("text/plain");
+          } else if (window.clipboardData) {
+            text = window.clipboardData.getData("Text");
+          }
+          if (document.queryCommandSupported("insertText")) {
+            document.execCommand("insertText", false, text);
           } else {
-            if (adjustFontSizePreviousUp === fontSize) {
-              console.log("BREAKING UP LOOP", fontSize);
-              adjustFontSizePreviousDown = 0;
-              adjustFontSizePreviousUp = 0;
+            document.execCommand("paste", false, text);
+          }
+        });
+
+        let previousIncreaseTargetFontSize = 0;
+        let previousIncreaseLargeTextTextContent = "";
+        const onResize = (contentRect) => {
+          console.log(JSON.stringify(contentRect, null, 4));
+
+          const style = window.getComputedStyle(largeText);
+          const currentFontSize = parseInt(style.fontSize);
+          console.log("currentFontSize", currentFontSize);
+
+          if (!largeText._dataFontSize) {
+            largeText._dataFontSize = currentFontSize;
+          }
+
+          const lineHeight = placeholder.offsetHeight;
+          console.log("lineHeight", lineHeight);
+
+          let shouldDecreaseFontSize = false;
+          if (
+            currentFontSize > 40 &&
+            contentRect.height > container.offsetHeight
+          ) {
+            console.log("ResizeObserver DECREASE FONT SIZE");
+            shouldDecreaseFontSize = true;
+          } else if (
+            currentFontSize < largeText._dataFontSize &&
+            contentRect.height < container.offsetHeight - lineHeight
+          ) {
+            console.log(
+              "ResizeObserver INCREASE FONT SIZE",
+              currentFontSize,
+              largeText._dataFontSize
+            );
+            shouldDecreaseFontSize = false;
+          } else {
+            console.log(
+              "ResizeObserver SKIP",
+              currentFontSize,
+              largeText._dataFontSize,
+              contentRect.height,
+              container.offsetHeight
+            );
+            return;
+          }
+
+          const nFullLines = Math.floor(contentRect.height / lineHeight);
+          console.log("nFullLines", nFullLines);
+
+          const targetLineHeight = container.offsetHeight / nFullLines;
+          console.log("targetLineHeight", targetLineHeight);
+
+          const ratio = targetLineHeight / lineHeight;
+          console.log("ratio", ratio);
+
+          let targetFontSize = Math.floor(currentFontSize * ratio);
+          console.log("targetFontSize", targetFontSize);
+
+          if (shouldDecreaseFontSize) {
+            if (targetFontSize < 40) {
+              targetFontSize = 40;
+            }
+            if (targetFontSize > currentFontSize) {
+              console.log("shouldDecreaseFontSize ABORT?!");
               return;
             }
-            adjustFontSizePreviousUp = fontSize;
+            if (targetFontSize === 40) {
+              console.log("shouldDecreaseFontSize stay minimum");
+              placeholder.style.fontSize = `${targetFontSize}px`;
+              largeText.style.fontSize = `${targetFontSize}px`;
+              return;
+            }
+            placeholder.style.fontSize = `${targetFontSize}px`;
+            placeholder._textContent = placeholder.textContent;
+            // placeholder.textContent = largeText.textContent;
+            placeholder.innerHTML = largeText.innerHTML;
+            if (placeholder.offsetHeight > container.offsetHeight) {
+              console.log("shouldDecreaseFontSize TOO BIG");
+              placeholder.textContent = placeholder._textContent;
+              placeholder.style.fontSize = style.fontSize;
+              contentRect.height += lineHeight;
+              setTimeout(() => {
+                debouncedOnResize(contentRect);
+              }, 0);
+              return;
+            } else {
+              console.log("shouldDecreaseFontSize DO");
+              placeholder.textContent = placeholder._textContent;
+              largeText.style.fontSize = `${targetFontSize}px`;
+            }
+          } else {
+            if (targetFontSize > largeText._dataFontSize) {
+              targetFontSize = largeText._dataFontSize;
+            }
+            if (targetFontSize < currentFontSize) {
+              console.log("!shouldDecreaseFontSize ABORT?!");
+              return;
+            }
+
+            const largeTextTextContent = largeText.textContent;
+            placeholder.style.fontSize = `${targetFontSize}px`;
+            placeholder._textContent = placeholder.textContent;
+            // placeholder.textContent = largeTextTextContent;
+            placeholder.innerHTML = largeText.innerHTML;
+            if (placeholder.offsetHeight > container.offsetHeight) {
+              console.log("!shouldDecreaseFontSize TOO BIG");
+              placeholder.textContent = placeholder._textContent;
+              placeholder.style.fontSize = style.fontSize;
+              contentRect.height += lineHeight;
+              setTimeout(() => {
+                debouncedOnResize(contentRect);
+              }, 0);
+
+              return;
+            } else {
+              if (
+                targetFontSize === previousIncreaseTargetFontSize &&
+                largeTextTextContent === previousIncreaseLargeTextTextContent
+              ) {
+                console.log("!shouldDecreaseFontSize CANCEL LOOP");
+                placeholder.textContent = placeholder._textContent;
+                previousIncreaseTargetFontSize = 0;
+                previousIncreaseLargeTextTextContent = "";
+              } else {
+                previousIncreaseTargetFontSize = targetFontSize;
+                previousIncreaseLargeTextTextContent = largeTextTextContent;
+                console.log("!shouldDecreaseFontSize DO");
+                placeholder.textContent = placeholder._textContent;
+                largeText.style.fontSize = `${targetFontSize}px`;
+              }
+            }
           }
-
-          largeText.style.fontSize = `${fontSize}px`;
-
-          console.log(
-            "FONT ADJUST",
-            down,
-            fontSize
-            //   largeText.offsetHeight,
-            //   container.offsetHeight
-          );
-
-          timerID = setTimeout(() => {
-            adjustFontSize();
-          }, 100);
         };
-        const updateStateSize = () => {
-          if (timerID) {
-            clearTimeout(timerID);
+        const debouncedOnResize = debounce(onResize, 200);
+        const resizeObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            debouncedOnResize({
+              height: entry.contentRect.height,
+              width: entry.contentRect.width,
+            });
+            break;
           }
-          adjustFontSizePreviousUp = 0;
-          adjustFontSizePreviousDown = 0;
-          adjustFontSize();
-
-          //   if (largeText.offsetHeight > container.offsetHeight) {
-          //     console.log(
-          //       "OVERFLOW !! :(",
-          //       largeText.offsetHeight,
-          //       container.offsetHeight
-          //     );
-          //     adjustFontSize(true);
-          //   } else {
-          //     console.log(
-          //       "NOT OVERFLOW :)",
-          //       largeText.offsetHeight,
-          //       container.offsetHeight
-          //     );
-          //     adjustFontSize(false);
-          //     // const fontSizeAttr = largeText.getAttribute("data-fontSize");
-          //     // if (fontSizeAttr) {
-          //     //   largeText.style.fontSize = fontSizeAttr;
-          //     //   console.log(fontSizeAttr);
-          //     // }
-          //   }
-        };
+        });
+        resizeObserver.observe(largeText);
 
         const updateStateEmpty = (forcePlaceholderRemove) => {
           const key =
@@ -334,7 +620,6 @@
             return;
           }
           previousLargeText = t;
-          updateStateSize();
         });
         largeText.addEventListener("keyup", (evt) => {
           console.log("keyup => placeholder update");
@@ -361,9 +646,12 @@
     </script>
   </head>
   <body>
-    <div id="container">
+    <div id="container2">
       <div id="placeholder">Type here...</div>
+    </div>
+    <div id="container">
       <div id="large" spellcheck="false" contenteditable>&nbsp;</div>
+      <!-- textarea id="large" placeholder=" " spellcheck="false">&nbsp;</textarea -->
     </div>
     <div id="controls">
       <div>

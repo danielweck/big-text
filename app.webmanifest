@@ -1,12 +1,21 @@
 {
-  "start_url": "https://danielweck.github.io/big-text/",
   "name": "Big Text",
   "short_name": "Big Text",
   "description": "Display Large Text",
-  "display": "standalone",
+  "start_url": "/index.html",
   "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "display": "standalone",
   "background_color": "#333333",
   "theme_color": "#eeeeee",
+  "screenshots": [
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
   "icons": [
     {
       "src": "icons/icon-72x72.png",
