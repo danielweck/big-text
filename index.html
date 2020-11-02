@@ -100,6 +100,9 @@
         white-space: pre-wrap;
         background-color: transparent;
       }
+      html.dark #large {
+        caret-color: lime;
+      }
       #placeholder {
         display: block;
         visibility: hidden;
@@ -196,6 +199,55 @@
       }
     </style>
     <script type="text/javascript">
+      const toHex = (n) => {
+        return "0123456789ABCDEF".charAt(n);
+      };
+      const encodePercents = (txt) => {
+        if (txt === "") {
+          return "";
+        }
+        let str = "";
+        for (var i = 0; i < txt.length; i++) {
+          let c = txt.charCodeAt(i);
+          let bs = new Array();
+          if (c > 0x10000) {
+            // 4 bytes
+            bs[0] = 0xf0 | ((c & 0x1c0000) >>> 18);
+            bs[1] = 0x80 | ((c & 0x3f000) >>> 12);
+            bs[2] = 0x80 | ((c & 0xfc0) >>> 6);
+            bs[3] = 0x80 | (c & 0x3f);
+          } else if (c > 0x800) {
+            // 3 bytes
+            bs[0] = 0xe0 | ((c & 0xf000) >>> 12);
+            bs[1] = 0x80 | ((c & 0xfc0) >>> 6);
+            bs[2] = 0x80 | (c & 0x3f);
+          } else if (c > 0x80) {
+            // 2 bytes
+            bs[0] = 0xc0 | ((c & 0x7c0) >>> 6);
+            bs[1] = 0x80 | (c & 0x3f);
+          } else {
+            // 1 byte
+            bs[0] = c;
+          }
+          for (var j = 0; j < bs.length; j++) {
+            var b = bs[j];
+            var hex = toHex((b & 0xf0) >>> 4) + toHex(b & 0x0f);
+            str += "%" + hex;
+          }
+        }
+        return str;
+      };
+      // const encodePercents_ = (txt) => {
+      //   return txt.split("").reduce((str, c) => {
+      //     return str + `%${parseInt(c.charCodeAt(0)).toString(16)}`;
+      //   }, "");
+      // };
+      // // %C2%B1
+      // console.log(encodePercents_("±")); // fail!
+      // console.log(encodePercents("±"));
+      // console.log(encodeURI("±"));
+      // console.log(encodeURIComponent("±"));
+
       // ########################################################################################
       // https://github.com/lodash/lodash/blob/e0029485ab4d97adea0cb34292afb6700309cf16/throttle.js#L52-L68
       // ALTERNATIVE: https://github.com/jashkenas/underscore/blob/ee99923b7882502a1ad56e3900c3bb267f3dcf76/underscore.js#L1084-L1123
@@ -377,6 +429,19 @@
       // ########################################################################################
 
       const onDOMContentLoaded = () => {
+        const queryParams = {};
+        let search = window.location.search;
+        if (search && search.length) {
+          search = search.substring(1);
+          const keyValPairs = search.split("&");
+          keyValPairs.forEach((keyValPair) => {
+            const keyValTuple = keyValPair.split("=");
+            if (keyValTuple.length > 1) {
+              queryParams[keyValTuple[0]] = decodeURIComponent(keyValTuple[1]);
+            }
+          });
+        }
+
         const checkDark = document.getElementById("check-dark");
         const checkDebug = document.getElementById("check-debug");
         const container = document.getElementById("container");
@@ -384,6 +449,9 @@
         const largeText = document.getElementById("large");
 
         largeText.focus();
+        if (queryParams.txt) {
+          largeText.textContent = queryParams.txt;
+        }
 
         largeText.addEventListener("paste", function (e) {
           e.preventDefault();
@@ -589,6 +657,13 @@
             settings.dark = true;
           }
 
+          if (queryParams.debug === "1") {
+            settings.debug = true;
+          }
+          if (queryParams.dark === "1") {
+            settings.dark = true;
+          }
+
           checkDark.checked = Boolean(settings.dark);
           updateStateDark();
 
@@ -598,12 +673,27 @@
           updateStateEmpty(false);
         }
 
+        const updateURL = () => {
+          const s = JSON.parse(
+            localStorage.getItem("largeTextSettings") || "{}"
+          );
+          history.replaceState(
+            { s },
+            `Big Text`,
+            `?debug=${s.debug ? 1 : 0}&dark=${
+              s.dark ? 1 : 0
+            }&txt=${encodeURIComponent(largeText.textContent || " ")}`
+          );
+        };
+
         const updateLocalStorageState = (key, val) => {
           const settings = JSON.parse(
             localStorage.getItem("largeTextSettings") || "{}"
           );
           settings[key] = val;
           localStorage.setItem("largeTextSettings", JSON.stringify(settings));
+
+          updateURL();
         };
 
         checkDark.addEventListener("click", (evt) => {
@@ -618,17 +708,10 @@
           updateLocalStorageState("debug", checkDebug.checked);
         });
 
-        let previousLargeText = "";
-        largeText.addEventListener("keydown", (evt) => {
-          const t = largeText.textContent;
-          if (t === previousLargeText) {
-            return;
-          }
-          previousLargeText = t;
-        });
         largeText.addEventListener("keyup", (evt) => {
           console.log("keyup => placeholder update");
           updateStateEmpty(false);
+          updateURL();
         });
         largeText.addEventListener("click", (evt) => {
           console.log("focus => placeholder update");
@@ -652,7 +735,7 @@
   </head>
   <body>
     <div id="container2">
-      <div id="placeholder">Type here...</div>
+      <div id="placeholder">BIG Text</div>
     </div>
     <div id="container">
       <div id="large" spellcheck="false" contenteditable>&nbsp;</div>
