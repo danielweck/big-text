@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html class="empty">
+<html class="empty" style="--fontSize: 160px">
   <head>
     <title>Big Text</title>
     <meta charset="UTF-8" />
@@ -35,6 +35,10 @@
         font-size: 1em;
         line-height: 1.2;
       }
+      /* body {
+        height: 100vh;
+        width: 100vw;
+      } */
       html {
         overflow: hidden;
       }
@@ -82,7 +86,6 @@
         flex: 1;
         font-family: serif;
         font-weight: bolder;
-        font-size: 10em;
         line-height: 1.2;
         padding-left: 0.5em;
         padding-right: 0.5em;
@@ -92,13 +95,18 @@
         caret-color: magenta;
         text-size-adjust: none;
         font-stretch: expanded;
-        word-break: break-all;
+        word-break: break-word;
         /*
         word-wrap: anywhere;
         overflow-wrap: anywhere;
         */
         white-space: pre-wrap;
         background-color: transparent;
+
+        font-size: var(--fontSize);
+      }
+      html.invisible #large {
+        visibility: hidden;
       }
       html.dark #large {
         caret-color: lime;
@@ -119,6 +127,21 @@
       html.debug #large {
         outline-style: dotted;
         outline-color: magenta;
+        outline-width: 4px;
+        outline-offset: -4px;
+      }
+      #overlay {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        pointer-events: none;
+        background: none;
+      }
+      html.overflow #overlay {
+        outline-style: solid;
+        outline-color: red;
         outline-width: 4px;
         outline-offset: -4px;
       }
@@ -199,6 +222,7 @@
       }
     </style>
     <script type="text/javascript">
+      //<![CDATA[
       const toHex = (n) => {
         return "0123456789ABCDEF".charAt(n);
       };
@@ -449,10 +473,8 @@
         const largeText = document.getElementById("large");
 
         largeText.focus();
-        if (queryParams.txt) {
-          largeText.textContent = queryParams.txt;
-        }
 
+        //textContent vs. innerHTML
         largeText.addEventListener("paste", function (e) {
           e.preventDefault();
 
@@ -467,153 +489,254 @@
           } else {
             document.execCommand("paste", false, text);
           }
-          setTimeout(() => {
-            updateStateEmpty();
-          }, 200);
         });
 
-        let previousIncreaseTargetFontSize = 0;
-        let previousIncreaseLargeTextTextContent = "";
-        const onResize = (contentRect) => {
-          console.log(JSON.stringify(contentRect, null, 4));
+        const FONT_SIZE_MAX = 160; // px
+        const FONT_SIZE_MIN = 40; // px
+        const HEIGHT_TOLERANCE = 0; // px
+        const LOOP_DELAY = 30;
+        const USE_HIDDEN_PLACEHOLDER = true;
 
-          const style = window.getComputedStyle(largeText);
-          const currentFontSize = parseInt(style.fontSize);
-          console.log("currentFontSize", currentFontSize);
+        placeholder._textContent = placeholder.textContent;
 
-          if (!largeText._dataFontSize) {
-            largeText._dataFontSize = currentFontSize;
+        const onMutation = (isMustDecreaseFontSize, previousFontSize) => {
+          const isLooping = typeof isMustDecreaseFontSize !== "undefined";
+
+          const el = USE_HIDDEN_PLACEHOLDER ? placeholder : largeText;
+
+          if (!isLooping) {
+            if (USE_HIDDEN_PLACEHOLDER) {
+              placeholder.innerHTML = largeText.innerHTML;
+            }
+            updateStateEmpty(false);
+            updateURL();
           }
+          const style = window.getComputedStyle(el);
+          const currentFontSize = parseInt(style.fontSize);
+          console.log(
+            "### MUTATION - currentFontSize",
+            currentFontSize,
+            isMustDecreaseFontSize,
+            previousFontSize
+          );
 
-          const lineHeight = placeholder.offsetHeight;
-          console.log("lineHeight", lineHeight);
+          if (!el._originalFontSize) {
+            el._originalFontSize = currentFontSize;
+            console.log(
+              "MUTATION - original font size: ",
+              el._originalFontSize
+            );
+          }
+          if (!el.textContent.trim().length) {
+            console.log(
+              "MUTATION - empty text, reset original font size: ",
+              el._originalFontSize
+            );
 
-          let shouldDecreaseFontSize = false;
-          if (
-            currentFontSize > 40 &&
-            contentRect.height > container.offsetHeight
-          ) {
-            console.log("ResizeObserver DECREASE FONT SIZE");
-            shouldDecreaseFontSize = true;
-          } else if (
-            currentFontSize < largeText._dataFontSize &&
-            contentRect.height < container.offsetHeight - lineHeight
-          ) {
-            console.log(
-              "ResizeObserver INCREASE FONT SIZE",
-              currentFontSize,
-              largeText._dataFontSize
+            if (USE_HIDDEN_PLACEHOLDER) {
+              el.style.fontSize = null;
+              placeholder.textContent = placeholder._textContent;
+            }
+            // triggers MutationObserver MutationRecord.type === "attribute"
+            // el.style.fontSize = `${el._originalFontSize}px`;
+            document.documentElement.style.setProperty(
+              "--fontSize",
+              `${el._originalFontSize}px`
             );
-            shouldDecreaseFontSize = false;
-          } else {
-            console.log(
-              "ResizeObserver SKIP",
-              currentFontSize,
-              largeText._dataFontSize,
-              contentRect.height,
-              container.offsetHeight
-            );
+
+            // triggers MutationObserver MutationRecord.type === "attribute"
+            // if (largeText.style.visibility === "hidden") {
+            //   largeText.style.visibility = "visible";
+            // }
+            document.documentElement.classList.remove("invisible");
+            document.documentElement.classList.remove("overflow");
+
+            el._lastOkFontSize = el._originalFontSize;
+
+            killOnMutationLoop();
             return;
           }
 
-          const nFullLines = Math.floor(contentRect.height / lineHeight);
-          console.log("nFullLines", nFullLines);
+          const mustDecreaseFontSize =
+            el.offsetHeight > container.offsetHeight + HEIGHT_TOLERANCE;
+          const mustIncreaseFontSize =
+            el.offsetHeight < container.offsetHeight - HEIGHT_TOLERANCE;
 
-          const targetLineHeight = container.offsetHeight / nFullLines;
-          console.log("targetLineHeight", targetLineHeight);
-
-          const ratio = targetLineHeight / lineHeight;
-          console.log("ratio", ratio);
-
-          let targetFontSize = Math.floor(currentFontSize * ratio);
-          console.log("targetFontSize", targetFontSize);
-
-          if (shouldDecreaseFontSize) {
-            if (targetFontSize < 40) {
-              targetFontSize = 40;
-            }
-            if (targetFontSize > currentFontSize) {
-              console.log("shouldDecreaseFontSize ABORT?!");
-              return;
-            }
-            if (targetFontSize === 40) {
-              console.log("shouldDecreaseFontSize stay minimum");
-              placeholder.style.fontSize = `${targetFontSize}px`;
-              largeText.style.fontSize = `${targetFontSize}px`;
-              return;
-            }
-            placeholder.style.fontSize = `${targetFontSize}px`;
-            placeholder._textContent = placeholder.textContent;
-            // placeholder.textContent = largeText.textContent;
-            placeholder.innerHTML = largeText.innerHTML;
-            if (placeholder.offsetHeight > container.offsetHeight) {
-              console.log("shouldDecreaseFontSize TOO BIG");
-              placeholder.textContent = placeholder._textContent;
-              placeholder.style.fontSize = style.fontSize;
-              contentRect.height += lineHeight;
-              setTimeout(() => {
-                debouncedOnResize(contentRect);
-              }, 0);
-              return;
-            } else {
-              console.log("shouldDecreaseFontSize DO");
-              placeholder.textContent = placeholder._textContent;
-              largeText.style.fontSize = `${targetFontSize}px`;
-            }
-          } else {
-            if (targetFontSize > largeText._dataFontSize) {
-              targetFontSize = largeText._dataFontSize;
-            }
-            if (targetFontSize < currentFontSize) {
-              console.log("!shouldDecreaseFontSize ABORT?!");
-              return;
+          const nope = !mustDecreaseFontSize && !mustIncreaseFontSize;
+          if (nope || mustIncreaseFontSize) {
+            if (!isLooping) {
+              el._lastOkFontSize = currentFontSize;
+            } else if (currentFontSize > el._lastOkFontSize) {
+              el._lastOkFontSize = currentFontSize;
             }
 
-            const largeTextTextContent = largeText.textContent;
-            placeholder.style.fontSize = `${targetFontSize}px`;
-            placeholder._textContent = placeholder.textContent;
-            // placeholder.textContent = largeTextTextContent;
-            placeholder.innerHTML = largeText.innerHTML;
-            if (placeholder.offsetHeight > container.offsetHeight) {
-              console.log("!shouldDecreaseFontSize TOO BIG");
-              placeholder.textContent = placeholder._textContent;
-              placeholder.style.fontSize = style.fontSize;
-              contentRect.height += lineHeight;
-              setTimeout(() => {
-                debouncedOnResize(contentRect);
-              }, 0);
+            console.log("MUTATION - _lastOkFontSize SET: ", el._lastOkFontSize);
+          } else if (!isLooping) {
+            console.log("MUTATION - _lastOkFontSize RESET");
+            el._lastOkFontSize = -1;
+          }
 
-              return;
-            } else {
-              if (
-                targetFontSize === previousIncreaseTargetFontSize &&
-                largeTextTextContent === previousIncreaseLargeTextTextContent
-              ) {
-                console.log("!shouldDecreaseFontSize CANCEL LOOP");
-                placeholder.textContent = placeholder._textContent;
-                previousIncreaseTargetFontSize = 0;
-                previousIncreaseLargeTextTextContent = "";
-              } else {
-                previousIncreaseTargetFontSize = targetFontSize;
-                previousIncreaseLargeTextTextContent = largeTextTextContent;
-                console.log("!shouldDecreaseFontSize DO");
-                placeholder.textContent = placeholder._textContent;
-                largeText.style.fontSize = `${targetFontSize}px`;
+          if (nope) {
+            console.log("MUTATION - NO decrease/increase font size, keep.");
+
+            killOnMutationLoop();
+            return;
+          }
+
+          if (onMutation._cancelTrying && isLooping) {
+            killOnMutationLoop();
+            onMutation._cancelTrying = false;
+            console.log("MUTATION - _cancelTrying");
+            return;
+          }
+          onMutation._cancelTrying = false;
+          console.log(
+            "MUTATION - must decrease font size: ",
+            mustDecreaseFontSize
+          );
+
+          //
+          const lowerBound = mustDecreaseFontSize
+            ? isLooping && !isMustDecreaseFontSize
+              ? previousFontSize
+              : FONT_SIZE_MIN
+            : currentFontSize;
+          const upperBound = mustDecreaseFontSize
+            ? currentFontSize
+            : isLooping && isMustDecreaseFontSize
+            ? previousFontSize
+            : FONT_SIZE_MAX;
+
+          const tryFontSize = Math[mustDecreaseFontSize ? "floor" : "ceil"](
+            lowerBound + (upperBound - lowerBound) / 2
+          );
+          console.log("MUTATION - tryFontSize: ", tryFontSize, currentFontSize);
+
+          if (
+            tryFontSize === currentFontSize ||
+            (onMutation._triedFontSizes &&
+              onMutation._triedFontSizes.includes(tryFontSize))
+          ) {
+            console.log(
+              "MUTATION - currentFontSize === tryFontSize, do nothing.",
+              currentFontSize,
+              tryFontSize,
+              previousFontSize,
+              mustDecreaseFontSize,
+              el._lastOkFontSize
+            );
+
+            if (
+              el._lastOkFontSize >= FONT_SIZE_MIN &&
+              el._lastOkFontSize <= FONT_SIZE_MAX
+            ) {
+              console.log(
+                "MUTATION - restore last ok font size.",
+                el._lastOkFontSize
+              );
+              if (USE_HIDDEN_PLACEHOLDER) {
+                el.style.fontSize = null;
               }
+
+              // triggers MutationObserver MutationRecord.type === "attribute"
+              // el.style.fontSize = `${el._lastOkFontSize}px`;
+              document.documentElement.style.setProperty(
+                "--fontSize",
+                `${el._lastOkFontSize}px`
+              );
+            } else if (USE_HIDDEN_PLACEHOLDER) {
+              el.style.fontSize = null;
+
+              // triggers MutationObserver MutationRecord.type === "attribute"
+              // el.style.fontSize = `${el._lastOkFontSize}px`;
+              document.documentElement.style.setProperty(
+                "--fontSize",
+                `${tryFontSize}px`
+              );
             }
+            killOnMutationLoop();
+
+            if (USE_HIDDEN_PLACEHOLDER) {
+              placeholder.textContent = placeholder._textContent;
+            }
+
+            // triggers MutationObserver MutationRecord.type === "attribute"
+            // if (largeText.style.visibility === "hidden") {
+            //   largeText.style.visibility = "visible";
+            // }
+            document.documentElement.classList.remove("invisible");
+
+            document.documentElement.classList[
+              largeText.offsetHeight > container.offsetHeight + HEIGHT_TOLERANCE
+                ? "add"
+                : "remove"
+            ]("overflow");
+
+            return;
+          }
+          if (USE_HIDDEN_PLACEHOLDER) {
+            el.style.fontSize = `${tryFontSize}px`;
+          } else {
+            // triggers MutationObserver MutationRecord.type === "attribute"
+            // el.style.fontSize = `${tryFontSize}px`;
+            document.documentElement.style.setProperty(
+              "--fontSize",
+              `${tryFontSize}px`
+            );
+          }
+
+          // killOnMutationLoop();
+          if (!onMutation._triedFontSizes) {
+            onMutation._triedFontSizes = [];
+          }
+          onMutation._triedFontSizes.push(tryFontSize);
+
+          onMutation._startedTrying = setTimeout(() => {
+            console.log(
+              "MUTATION - tryFontSize onMutation: ",
+              tryFontSize,
+              mustDecreaseFontSize,
+              currentFontSize
+            );
+
+            onMutation(
+              isLooping ? isMustDecreaseFontSize : mustDecreaseFontSize,
+              isLooping ? previousFontSize : currentFontSize
+            );
+          }, LOOP_DELAY);
+        };
+
+        const killOnMutationLoop = () => {
+          if (onMutation._startedTrying) {
+            window.clearTimeout(onMutation._startedTrying);
+            onMutation._startedTrying = undefined;
+            onMutation._triedFontSizes = [];
           }
         };
-        const debouncedOnResize = debounce(onResize, 200);
-        const resizeObserver = new ResizeObserver((entries) => {
-          for (const entry of entries) {
-            debouncedOnResize({
-              height: entry.contentRect.height,
-              width: entry.contentRect.width,
-            });
-            break;
+
+        const debouncedOnMutation = debounce(onMutation, 200);
+        const observer = new MutationObserver((mutationsList, observer) => {
+          console.log("----------- MUTATION!", mutationsList.length);
+          for (const mutation of mutationsList) {
+            console.log("----------- MUTATION: ", mutation.type);
           }
+          if (onMutation._startedTrying) {
+            window.clearTimeout(onMutation._startedTrying);
+            onMutation._startedTrying = undefined;
+            onMutation._triedFontSizes = [];
+            console.log("----------- MUTATION .... cancel signal");
+            onMutation._cancelTrying = true;
+          } else {
+            onMutation._cancelTrying = false;
+          }
+          debouncedOnMutation();
         });
-        resizeObserver.observe(largeText);
+        observer.observe(largeText, {
+          attributes: true,
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
 
         const updateStateEmpty = (forcePlaceholderRemove) => {
           const key =
@@ -659,10 +782,16 @@
 
           if (queryParams.debug === "1") {
             settings.debug = true;
+          } else if (typeof queryParams.debug !== "undefined") {
+            settings.debug = false;
           }
           if (queryParams.dark === "1") {
             settings.dark = true;
+          } else if (typeof queryParams.dark !== "undefined") {
+            settings.dark = false;
           }
+
+          localStorage.setItem("largeTextSettings", JSON.stringify(settings));
 
           checkDark.checked = Boolean(settings.dark);
           updateStateDark();
@@ -670,7 +799,25 @@
           checkDebug.checked = Boolean(settings.debug);
           updateStateDebug();
 
-          updateStateEmpty(false);
+          if (queryParams.txt) {
+            setTimeout(() => {
+              // triggers MutationObserver MutationRecord.type === "attribute"
+              // largeText.style.visibility = "hidden";
+              document.documentElement.classList.add("invisible");
+
+              const src = queryParams.txt
+                .replace(/onload\s*=/g, "onloadx=")
+                .replace(/onclick\s*=/g, "onclickx=")
+                .replace(/onerror\s*=/g, "onerrorx=")
+                .replace(/<script/g, "<scriptx")
+                .replace(/<\/script>/g, "\x3C/scriptx>"); // textContent
+              console.log(src);
+              largeText.innerHTML = src;
+              updateStateEmpty(false);
+            }, 300);
+          } else {
+            updateStateEmpty(false);
+          }
         }
 
         const updateURL = () => {
@@ -682,7 +829,7 @@
             `Big Text`,
             `?debug=${s.debug ? 1 : 0}&dark=${
               s.dark ? 1 : 0
-            }&txt=${encodeURIComponent(largeText.textContent || " ")}`
+            }&txt=${encodeURIComponent(largeText.innerHTML || " ")}` // textContent
           );
         };
 
@@ -708,20 +855,6 @@
           updateLocalStorageState("debug", checkDebug.checked);
         });
 
-        largeText.addEventListener("keyup", (evt) => {
-          console.log("keyup => placeholder update");
-          updateStateEmpty(false);
-          updateURL();
-        });
-        largeText.addEventListener("click", (evt) => {
-          console.log("focus => placeholder update");
-          updateStateEmpty(false);
-        });
-        largeText.addEventListener("focusin", (evt) => {
-          console.log("focus => placeholder remove");
-          updateStateEmpty(false);
-        });
-
         container.addEventListener("click", (evt) => {
           console.log("click => focus text");
           largeText.focus();
@@ -731,6 +864,7 @@
         console.log("DOMContentLoaded");
         onDOMContentLoaded();
       });
+      //]]>
     </script>
   </head>
   <body>
@@ -753,5 +887,6 @@
         >
       </div>
     </div>
+    <div id="overlay"></div>
   </body>
 </html>
